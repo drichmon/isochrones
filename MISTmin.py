@@ -1,111 +1,3 @@
-'''
-def endIndexx(x, MIST_file):#group all the same ages by their range of indicies in the file, then find the minimum. After the minimum, skip lines until the next age starts
-    i = 0
-    endIndex = []
-    with MIST_file as infile:
-        for line in infile:
-            if i >= x:
-                if len(line.strip()) == 0:
-                    endIndex.append(i)
-                    i +=1
-                else:
-                    i += 1
-            else:
-                i += 1
-    endIndex = endIndex[::2]
-    endIndex.append(i)
-    endIndex.append(x)
-    return sorted(endIndex)
-'''
-'''
-def group_Ages(Age_dict, MIST_file, endIndex, x):
-    i = 0
-    j = 0 
-    k = 1
-    lines = []
-    dictionary = {}
-    MIST_file = open(inpath +file1, 'r')
-    with MIST_file as infile:
-        for line in infile:
-            try:
-                if i >= (x-5):
-                    if i == endIndex[k]:
-                        k += 1 
-                        i += 1
-                        lines.append(line)
-                        dictionary[Age_dict[j]] = lines[4:len(lines)-1]
-                        j += 1
-                        lines = []
-                    elif i in range(endIndex[j], endIndex[k]):
-                        lines.append(line)
-                        i += 1
-                    else:
-                        lines.append(line)
-                        i += 1
-                else:
-                    i += 1
-            except (IndexError):
-                pass
-    MIST_file.close()
-    return dictionary
-'''
-'''
-def findMin(groupAges, log_g): #old method
-    minIndex = []
-    for item in groupAges:
-        a = groupAges[item] 
-        i = 0
-        log_g = []
-        for i in range(len(a)):
-            log_g.append(a[i][141:165])
-            i += 1
-        x = []
-        for item in log_g:
-            if '+' in item:
-                i = float(item[:item.index('E')]) * 10 ** int(item[item.index('+'):])
-                x.append(i)
-            elif '-' in item:
-                i = float(item[:item.index('E')]) * 10 ** int(item[item.index('E')+1:])
-                x.append(i)
-        numpyarray = np.array(x)
-        print len(numpyarray)
-        minimum  = np.argmin(numpyarray) #scipy.signal.argrelmin(numpyarray, order=1000)[0][0]
-        #print minimum
-        minIndex.append(minimum)
-    #print minIndex
-    return minIndex
-'''
-'''
-def cut(minIndex, groupAges): #old method
-    dummylist = []
-    f = open('/home/richmond/extrastuff/MIST_%stemp.dat' % metallicity, 'w')
-    #i = 0
-    print minIndex
-    for i, item in enumerate(sorted(groupAges)):
-        a = groupAges[item]
-        dummylist.extend(a[:minIndex[i]+1])
-        #for line in a:
-        #    if j <= minIndex[i]:                
-        #        dummylist.append(line)
-        #        j += 1
-        #i += 1 #very important that this stays in this indentation
-    print 'dummy', len(dummylist)
-    for line in dummylist:
-        print >>f, line, 
-    f.close()
-'''
-'''
-def get_skiprows(inputAge, MIST_file):
-    i = 0 
-    with MIST_file as infile:
-        for line in infile:
-            if inputAge not in line:
-                i += 1
-            if inputAge in line:
-                print i
-                return i
-    MIST_file.close()
-'''
 import numpy as np
 import scipy.signal
 import re
@@ -114,8 +6,8 @@ from collections import OrderedDict
 from astropy.io import fits
 import scipy.signal
 
-inpath = '/home/richmond/Isochrones/MIST/MIST_v1.0_vvcrit0.4_UBVRIplus/interpolated/' #path to isochrone files
-outpath = '/home/richmond/extrastuff/' #desired output for FITS files
+inpath = '/home/dylan/Isochrones/MIST/' #path to isochrone files
+outpath = '/home/dylan/Isochrones/FITS/' #desired output for FITS files
 
 def find_Metallicity(MIST_file):
     i = 0
@@ -198,7 +90,7 @@ def cut(minIndex, columns, endIndex, Ages):
             pass
     FinalcutColumns = np.asarray(FinalcutColumns)
     #print FinalcutColumns
-    np.savetxt('/home/richmond/extrastuff/MIST_%stemp.dat' % metallicity, FinalcutColumns, fmt='%.4e')
+    np.savetxt('/home/dylan/Isochrones/temp/MIST_%stemp.dat' % metallicity, FinalcutColumns, fmt='%.4e')
 
 
 def fitsTable(logAge, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath):
@@ -215,10 +107,9 @@ def fitsTable(logAge, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Ma
     tbhdu.writeto(outpath + 'MIST.fits', clobber=True) #fits outfile
 
 
-
-metallicitylist = []
-
-for file1 in sorted(os.listdir(inpath)): #this loop can be commented out to save time if temp files are already created
+#the following for loop is unreliable. I have spent too much time on this with no results. This for loop is intended to cut every isochrone at its absolute minimum log G and put everything before this minimum into a temporary file where it will then be turned into a fits file 
+'''
+for file1 in os.listdir(inpath): #this loop can be commented out to save time if temp files are already created
     if '.cmd' in file1:
         if 'plus' in file1:
             columns = np.loadtxt(inpath + file1)
@@ -230,6 +121,7 @@ for file1 in sorted(os.listdir(inpath)): #this loop can be commented out to save
             metallicity = find_Metallicity(MIST_file)
             metallicitylist.append(metallicity)
             endIndex = np.where(columns[1:, 0] - columns[:-1, 0] < 0)[0] #endIndexx(x, MIST_file)
+            endIndex = np.insert(endIndex, 0, [0])
             #print endIndex
             minIndex = findMin(log_g, endIndex)
             #print minIndex
@@ -244,12 +136,28 @@ for file1 in sorted(os.listdir(inpath)): #this loop can be commented out to save
             metallicity = find_Metallicity(MIST_file)
             metallicitylist.append(metallicity)
             endIndex = np.where(columns[1:, 0] - columns[:-1, 0] < 0)[0] #endIndexx(x, MIST_file)
+            endIndex = np.insert(endIndex, 0, [0])
             minIndex = findMin(log_g, endIndex)
             #print minIndex
             cut(minIndex, columns, endIndex, Ages)
             print 'temp file created for: ' + file1 + "\t" + metallicity
+'''
 
-newinpath = '/home/richmond/extrastuff/' #location of temp files
+
+
+metallicitylist = {}
+#the following for loop does not cut out minimum log G, but it provides a reliable transfer of data into FITS file 
+for file in os.listdir(inpath): #loop can be commented out if desired temp files have already been created
+    if '.cmd' in file:
+        columns = np.loadtxt(inpath + file)
+        MIST_file = open(inpath +file, 'r')
+        metallicity = find_Metallicity(MIST_file)
+        metallicitylist[file] = metallicity
+        #metallicitylist.append(metallicity)
+        np.savetxt('/home/dylan/Isochrones/temp/%s' % file, columns)
+        print 'temp file for %s has been created' % file
+
+newinpath = '/home/dylan/Isochrones/temp/' #location of temp files
 
 logAge = []
 initial_mass = []
@@ -260,9 +168,11 @@ _2Mass_H = []
 _2Mass_Ks = []
 metallicityarray = []
 met_index = 0
-for file in sorted(os.listdir(newinpath)):
-    if '.dat' in file: # makes sure it only iterates over isochrone files
+print metallicitylist
+for file in os.listdir(newinpath):
+    if 'cmd' in file: # makes sure it only iterates over isochrone files
         columns = np.loadtxt(newinpath + file)
+        print columns.shape[1]
         if columns.shape[1] == 24:
             for i in columns:
                 logAge.append(i[1])
@@ -272,7 +182,7 @@ for file in sorted(os.listdir(newinpath)):
                 _2Mass_J.append(i[12])
                 _2Mass_H.append(i[13])
                 _2Mass_Ks.append(i[14])
-                metallicityarray.append(metallicitylist[met_index])
+                metallicityarray.append(metallicitylist[file])
         else:    
             for i in columns:
                 logAge.append(i[1])
@@ -282,7 +192,7 @@ for file in sorted(os.listdir(newinpath)):
                 _2Mass_J.append(i[14])
                 _2Mass_H.append(i[15])
                 _2Mass_Ks.append(i[16])
-                metallicityarray.append(metallicitylist[met_index])
+                metallicityarray.append(metallicitylist[file])
         met_index += 1
 
 logAge = np.array(logAge)
