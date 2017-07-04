@@ -22,15 +22,6 @@ def find_Metallicity(Yale_file):
                 metallicity = float(line[52:61])
     Yale_file.close()
     return metallicity
-            
-def log_teff_to_teff(log_Teff):
-    i = 0
-    for item in log_Teff:
-        item = 10 ** item
-        np.put(log_Teff, i, item)
-        i +=1
-    return log_Teff
-
 
 def getAge(Yale_file, x):
     Ages = []
@@ -56,7 +47,7 @@ def getAge(Yale_file, x):
                         pass
     return Ages
     Yale_file.close()
-
+'''
 def get_skiprows(inputAge, Yale_file): #currently only works for age values < 10
     i = 1
     term = "age(Gyr)= " + str(inputAge)
@@ -68,38 +59,45 @@ def get_skiprows(inputAge, Yale_file): #currently only works for age values < 10
             i += 1
             return i
     Yale_file.close()
-
-def fitsTable(listOfAges, metallicity, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, Yale_file, outpath):
+'''
+def CompiledAges(listOfAges, initial_mass, columns):
+    finalAges = []
     i = 0
     j = 1
     k = 0
-    metallicityList = []
-    Ages = listOfAges
-    finalAges = []
-    with Yale_file as infile:
-        for line in infile:
-            try:
-                if len(line.strip()) == 0:
-                    #print ''
-                    k += 1
-                elif len(line.strip()) != 0:
-                    if '#' in line:
-                        x = '##age(Gyr)=' #do something pointless
-                        #print x + str(nextAge)
-                    elif '#' not in line:
-                        nextAge = Ages[k]
-                        finalAges.append(float(nextAge))
-                        metallicityList.append(metallicity)
-                        i += 1
-                else:
-                    break
-            except (IndexError):
-                pass
-        Yale_file.close()
-    x = np.array(finalAges)
-    metallicityArray = np.array(metallicityList)
+    for item in columns:
+        np.set_printoptions(precision=14)
+        try:
+            if columns[j, 0] - columns[i, 0] <-0.5: #sometimes the mass values do not increase within an isochrone as assumed, we are only looking for when the differences are large to know when to jump to the next age
+                nextAge = listOfAges[k]
+                k += 1
+                j += 1
+                finalAges.append(nextAge)
+                i += 1
+            elif columns[j, 0] - columns[i, 0] >-0.5:
+                nextAge = listOfAges[k]
+                j += 1
+                finalAges.append(nextAge)
+                i += 1
+            else:
+                finalAges.append(nextAge)
+                break
+        except (IndexError):
+            finalAges.append(nextAge)
+            pass    
+    return finalAges
+
+def fitsTable(listOfAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath):
+    metallicitylist = np.array(metallicitylist)
+    x = np.array(allAges) 
+    initial_mass = np.array(initial_mass)
+    Teff = np.array(Teff)
+    log_g = np.array(log_g)
+    _2Mass_J = np.array(_2Mass_J)
+    _2Mass_H = np.array(_2Mass_H)
+    _2Mass_Ks = np.array(_2Mass_Ks)
     col1 = fits.Column(name='logAge', format='E', array=x)
-    col2 = fits.Column(name='Metallicity', format='E', array=metallicityList)
+    col2 = fits.Column(name='Metallicity', format='E', array=metallicitylist)
     col3 = fits.Column(name='Teff', format='E', array=Teff)
     col4 = fits.Column(name='Log G', format='E', array=log_g)
     col5 =  fits.Column(name='Mass', format='E', array=initial_mass)
@@ -108,27 +106,42 @@ def fitsTable(listOfAges, metallicity, initial_mass, Teff, log_g, _2Mass_J, _2Ma
     col8 =  fits.Column(name='Ks', format='E', array=_2Mass_Ks)
     cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8])
     tbhdu = fits.BinTableHDU.from_columns(cols)
-    tbhdu.writeto(outpath + 'Yale_%s.fits' % str(metallicity), clobber=True) #fits outfile
+    tbhdu.writeto(outpath + 'Yale.fits', clobber=True) #fits outfile
     
  
-inputAge = str(0.150)# raw_input('')
+#inputAge = str(0.150)# raw_input('')
+initial_mass = [] 
+log_Teff = []
+log_g = []
+_2Mass_J = []
+_2Mass_H = []
+_2Mass_Ks = []
+Teff = []
+metallicitylist = []
+allAges = []
 
 for file in sorted(os.listdir(inpath)):
     file1 = file
-    Yale_file = open(inpath +file1, 'r')
-    num_skip_rows = get_skiprows(inputAge, Yale_file)
-    x = num_skip_rows -1
-    initial_mass = np.loadtxt(inpath +file1, skiprows = x, usecols = (0,))
-    log_Teff = np.loadtxt(inpath +file1, skiprows = x, usecols = (1,))
-    log_g = np.loadtxt(inpath +file1, skiprows = x, usecols = (3,))
-    _2Mass_J = np.loadtxt(inpath +file1, skiprows = x, usecols = (9,))
-    _2Mass_H = np.loadtxt(inpath +file1, skiprows = x, usecols = (10,))
-    _2Mass_Ks = np.loadtxt(inpath +file1, skiprows = x, usecols = (11,))
-    Teff = log_teff_to_teff(log_Teff)
+    x = 5
+    columns = np.loadtxt(inpath + file1)
+    initial_mass.extend(columns[:, 0])
+    log_Teff.extend(columns[:, 1])
+    log_g.extend(columns[:, 3])
+    _2Mass_J.extend(columns[:, 9])
+    _2Mass_H.extend(columns[:, 10])
+    _2Mass_Ks.extend(columns[:, 11])
     Yale_file = open(inpath +file1, 'r')
     metallicity = find_Metallicity(Yale_file)
+    for item in columns:
+        metallicitylist.append(metallicity)
     Yale_file = open(inpath +file1, 'r')
     listOfAges = getAge(Yale_file, x)
     Yale_file = open(inpath +file1, 'r')
+    Ages = CompiledAges(listOfAges, initial_mass, columns)
+    allAges.extend(Ages)
     print file1 + '\t' + str(metallicity)
-    fitsTable(listOfAges, metallicity, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, Yale_file, outpath)
+
+
+Teff.extend(np.power(10, log_Teff))
+fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath)
+print 'FITS file created for Yale'

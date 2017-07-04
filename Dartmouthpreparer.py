@@ -5,8 +5,8 @@ import argparse
 from astropy.io import fits
 
 
-inpath = '/home/dylan/Isochrones/Dartmouth/' #path to isochrone files
-outpath = '/home/dylan/Isochrones/FITS/' #desired output for FITS files
+inpath = '/home/richmond/Isochrones/Dartmouth/interpolated/' #path to isochrone files
+outpath = '/home/richmond/Isochrones/FITS/' #desired output for FITS files
 
 def find_Metallicity(Dartmouth_file):
     i = 0
@@ -76,8 +76,10 @@ def CompiledAges(listOfAges, initial_mass, columns):
                 #metallicityList.append(metallicity)
                 i += 1
             else:
+                finalAges.append(nextAge)
                 break
         except (IndexError):
+            finalAges.append(nextAge)
             pass    
     return finalAges
 
@@ -117,31 +119,33 @@ Teff = []
 metallicitylist = []
 allAges = []
 
-inputAge = str(1.000)
+#inputAge = str(1.000)
 for file in sorted(os.listdir(inpath)):
     file1 = file
     x = 5
-    columns = np.loadtxt(inpath + file1)
-    EEP.extend(columns[:, 0])
-    initial_mass.extend(columns[:, 1])
-    log_Teff.extend(columns[:, 2])
-    log_g.extend(columns[:, 3])
-    _2Mass_J.extend(columns[:, 10])
-    _2Mass_H.extend(columns[:, 11])
-    _2Mass_Ks.extend(columns[:, 12])
-    Dartmouth_file = open(inpath +file1, 'r')
-    metallicity = find_Metallicity(Dartmouth_file)
-    Dartmouth_file = open(inpath +file1, 'r')
-    for item in columns:
-        metallicitylist.append(metallicity)
-    print len(metallicitylist)
-    Dartmouth_file = open(inpath +file1, 'r')
-    listOfAges = getAge(Dartmouth_file, x)
-    print file1 + '\t' + metallicity
-    Ages = CompiledAges(listOfAges, initial_mass, columns)
-    allAges.extend(Ages)
+    if 'dat' in file1:
+        columns = np.loadtxt(inpath + file1)
+        EEP.extend(columns[:, 0])
+        initial_mass.extend(columns[:, 1])
+        log_Teff.extend(columns[:, 2])
+        log_g.extend(columns[:, 3])
+        _2Mass_J.extend(columns[:, 10])
+        _2Mass_H.extend(columns[:, 11])
+        _2Mass_Ks.extend(columns[:, 12])
+        Dartmouth_file = open(inpath +file1, 'r')
+        metallicity = find_Metallicity(Dartmouth_file)
+        Dartmouth_file = open(inpath +file1, 'r')
+        for item in columns:
+            metallicitylist.append(metallicity)
+        #print len(metallicitylist)
+        Dartmouth_file = open(inpath +file1, 'r')
+        listOfAges = getAge(Dartmouth_file, x)
+        print file1 + '\t' + metallicity
+        Ages = CompiledAges(listOfAges, initial_mass, columns)
+        allAges.extend(Ages)
 
 Teff.extend(np.power(10, log_Teff))
 print len(Teff)
 fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath)
 
+print 'FITS file created for Dartmouth'
