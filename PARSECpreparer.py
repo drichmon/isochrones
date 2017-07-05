@@ -32,7 +32,7 @@ def getAge(PARSEC_file, x):
             if term in line:
                 #print line[72:78] + '\t' + line[80:83]
                 Age = line[72:83]#float(line[72:78]) * 10 ** int(line[80:83]) #PREVIOUSLY +1 TO ALL INDICIES IN THIS LINE
-                Ages.append(Age)
+                Ages.append(float(Age))
     return Ages
     PARSEC_file.close()
 
@@ -77,8 +77,8 @@ def CompiledAges(listOfAges, initial_mass, columns):
             pass    
     return finalAges
 
-def fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath):
-    metallicityList = np.array(metallicitylist)   
+def fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, evo_stage, outpath, listOfAges):
+    metallicityList = np.array(metallicitylist)  
     x = np.array(allAges) 
     initial_mass = np.array(initial_mass)
     Teff = np.array(Teff)
@@ -87,19 +87,27 @@ def fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2M
     _2Mass_H = np.array(_2Mass_H)
     _2Mass_Ks = np.array(_2Mass_Ks)
     metallicityArray = np.array(metallicityList)
-    col1 = fits.Column(name='logAge', format='E', array=x)
-    col2 = fits.Column(name='Metallicity', format='E', array=metallicityList)
-    col3 = fits.Column(name='Teff', format='E', array=Teff)
-    col4 = fits.Column(name='Log G', format='E', array=log_g)
-    col5 =  fits.Column(name='Mass', format='E', array=initial_mass)
+    evo_stage = np.array(evo_stage)
+    ones = np.full(len(allAges), 1)
+    col1 = fits.Column(name='age', format='E', array=x)
+    col2 = fits.Column(name='feh', format='E', array=metallicityList)
+    col3 = fits.Column(name='T', format='E', array=Teff)
+    col4 = fits.Column(name='logg', format='E', array=log_g)
+    col5 =  fits.Column(name='mass', format='E', array=initial_mass)
     col6 =  fits.Column(name='J', format='E', array=_2Mass_J)
     col7 =  fits.Column(name='H', format='E', array=_2Mass_H)
-    col8 =  fits.Column(name='Ks', format='E', array=_2Mass_Ks)
-    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8])
+    col8 =  fits.Column(name='K', format='E', array=_2Mass_Ks)
+    col9 = fits.Column(name='stage', format='K', array=evo_stage)
+    col10 =  fits.Column(name='weight', format='E', array=ones)
+    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10])
     tbhdu = fits.BinTableHDU.from_columns(cols)
-    tbhdu.writeto(outpath + 'PARSEC.fits', clobber=True) #fits outfile
+    ageGridhdu = fits.BinTableHDU.from_columns([fits.Column(name='Age Grid', format='E', array=listOfAges)])
+    agelisthdr = fits.Header()
+    agelisthdr['Ages'] = 'Age grid' #don't really know what I'm doing here/if this is necessary
+    agelisthdu = fits.PrimaryHDU(header=agelisthdr)
+    tbhdulist = fits.HDUList([agelisthdu, tbhdu, ageGridhdu])
+    tbhdulist.writeto(outpath + 'PARSEC.fits', clobber=True) #fits outfile
 
-#inputAge = str(4.0738) #raw_input('')
 initial_mass = [] 
 log_Teff = []
 log_g = []
@@ -109,6 +117,7 @@ _2Mass_Ks = []
 Teff = []
 metallicitylist = []
 allAges = []
+evo_stage = []
 
 for file in sorted (os.listdir(inpath)): 
     if '.dat' in file: #makes sure we only iterate over the isochrone files
@@ -121,16 +130,16 @@ for file in sorted (os.listdir(inpath)):
         _2Mass_H.extend(columns[:, 14])
         _2Mass_Ks.extend(columns[:, 15])
         allAges.extend(columns[:, 1])
+        evo_stage.extend(columns[:, 17])
         PARSEC_file = open(inpath +file, 'r')
         metallicity = find_Metallicity(PARSEC_file)
         for item in columns:
             metallicitylist.append(metallicity)
         print file + '\t' + metallicity
 
-        
+listOfAges = getAge(open(inpath + 'bv_iso_0.000100.dat', 'r'), x) #not necessary to loop this      
 
 Teff.extend(np.power(10, log_Teff))
-#allAges = np.power(10, allAges) #uncomment for linear ages, also change name of fits column from logAge ---> Age
-fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath)
+fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, evo_stage, outpath, listOfAges)
 
 print 'FITS file created for PARSEC'

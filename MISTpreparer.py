@@ -76,7 +76,7 @@ def cut(minIndex, columns, endIndex, Ages):
     np.savetxt('/home/richmond/Isochrones/temp/MIST_%stemp.dat' % metallicity, FinalcutColumns, fmt='%.4e')
 '''
 
-def fitsTable(logAge, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath):
+def fitsTable(logAge, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, evo_stage, outpath, listOfAges):
     logAge = np.array(logAge)
     initial_mass = np.array(initial_mass)
     Teff = np.array(Teff)
@@ -84,18 +84,27 @@ def fitsTable(logAge, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Ma
     _2Mass_J = np.array(_2Mass_J)
     _2Mass_H = np.array(_2Mass_H)
     _2Mass_Ks = np.array(_2Mass_Ks)
+    evo_stage = np.array(evo_stage)
     metallicitylist = np.array(metallicitylist)
-    col1 = fits.Column(name='logAge', format='E', array=logAge)
-    col2 = fits.Column(name='Metallicity', format='E', array=metallicitylist)
-    col3 = fits.Column(name='Teff', format='E', array=Teff)
-    col4 = fits.Column(name='Log G', format='E', array=log_g)
-    col5 =  fits.Column(name='Mass', format='E', array=initial_mass)
+    ones = np.full(len(logAge), 1)
+    col1 = fits.Column(name='age', format='E', array=logAge)
+    col2 = fits.Column(name='feh', format='E', array=metallicitylist)
+    col3 = fits.Column(name='T', format='E', array=Teff)
+    col4 = fits.Column(name='logg', format='E', array=log_g)
+    col5 =  fits.Column(name='mass', format='E', array=initial_mass)
     col6 =  fits.Column(name='J', format='E', array=_2Mass_J)
     col7 =  fits.Column(name='H', format='E', array=_2Mass_H)
-    col8 =  fits.Column(name='Ks', format='E', array=_2Mass_Ks)
-    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8])
+    col8 =  fits.Column(name='K', format='E', array=_2Mass_Ks)
+    col9 =  fits.Column(name='stage', format='K', array=evo_stage)
+    col10 =  fits.Column(name='weight', format='E', array=ones)
+    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10])
     tbhdu = fits.BinTableHDU.from_columns(cols)
-    tbhdu.writeto(outpath + 'MIST.fits', clobber=True) #fits outfile
+    ageGridhdu = fits.BinTableHDU.from_columns([fits.Column(name='Age Grid', format='E', array=listOfAges)])
+    agelisthdr = fits.Header()
+    agelisthdr['Ages'] = 'Age grid'
+    agelisthdu = fits.PrimaryHDU(header=agelisthdr)
+    tbhdulist = fits.HDUList([agelisthdu, tbhdu, ageGridhdu])
+    tbhdulist.writeto(outpath + 'MIST.fits', clobber=True) #fits outfile
 
 
 logAge = []
@@ -105,8 +114,11 @@ log_g = []
 _2Mass_J = []
 _2Mass_H = []
 _2Mass_Ks = []
+evo_stage = []
 metallicitylist = []
 Teff = []
+listOfAges = []
+
 
 for file in sorted(os.listdir(inpath)):
     if 'cmd' in file: # makes sure it only iterates over isochrone files
@@ -120,6 +132,7 @@ for file in sorted(os.listdir(inpath)):
             _2Mass_J.extend(columns[:,12])
             _2Mass_H.extend(columns[:,13])
             _2Mass_Ks.extend(columns[:,14])
+            evo_stage.extend(columns[:, 23])
             MIST_file = open(inpath +file, 'r')
             metallicity = find_Metallicity(MIST_file)
             for item in columns:
@@ -134,14 +147,21 @@ for file in sorted(os.listdir(inpath)):
             _2Mass_J.extend(columns[:,14])
             _2Mass_H.extend(columns[:,15])
             _2Mass_Ks.extend(columns[:,16])
+            evo_stage.extend(columns[:, 25])
             MIST_file = open(inpath +file, 'r')
             metallicity = find_Metallicity(MIST_file)
             for item in columns:
                 metallicitylist.append(metallicity)
             print file + '\t' + str(metallicity)
 
-
+for item in logAge:
+    i = 1
+    if item not in listOfAges:
+        listOfAges.append(item)
+        i += 1
+    elif item in listOfAges and i > 106: #attempts to prevent this from looping 7 million + times...
+        break
 Teff.extend(np.power(10, log_Teff)) # log_teff_to_teff(log_Teff)
-fitsTable(logAge, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath)
+fitsTable(logAge, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, evo_stage, outpath, listOfAges)
 print 'FITS file created for MIST'
 

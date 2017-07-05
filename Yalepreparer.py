@@ -40,9 +40,9 @@ def getAge(Yale_file, x):
                     Age = line[x:17] #make that the starting index for age
                     try:
                         if float(Age) > 0.000:
-                            Ages.append(Age)
+                            Ages.append(float(Age))
                         else:
-                            Ages.append(line[10:16])
+                            Ages.append(float(line[10:16]))
                     except (ValueError):
                         pass
     return Ages
@@ -72,22 +72,22 @@ def CompiledAges(listOfAges, initial_mass, columns):
                 nextAge = listOfAges[k]
                 k += 1
                 j += 1
-                finalAges.append(nextAge)
+                finalAges.append(float(nextAge))
                 i += 1
             elif columns[j, 0] - columns[i, 0] >-0.5:
                 nextAge = listOfAges[k]
                 j += 1
-                finalAges.append(nextAge)
+                finalAges.append(float(nextAge))
                 i += 1
             else:
-                finalAges.append(nextAge)
+                finalAges.append(float(nextAge))
                 break
         except (IndexError):
-            finalAges.append(nextAge)
+            finalAges.append(float(nextAge))
             pass    
     return finalAges
 
-def fitsTable(listOfAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath):
+def fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath, listOfAges):
     metallicitylist = np.array(metallicitylist)
     x = np.array(allAges) 
     initial_mass = np.array(initial_mass)
@@ -96,17 +96,26 @@ def fitsTable(listOfAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, 
     _2Mass_J = np.array(_2Mass_J)
     _2Mass_H = np.array(_2Mass_H)
     _2Mass_Ks = np.array(_2Mass_Ks)
-    col1 = fits.Column(name='logAge', format='E', array=x)
-    col2 = fits.Column(name='Metallicity', format='E', array=metallicitylist)
-    col3 = fits.Column(name='Teff', format='E', array=Teff)
-    col4 = fits.Column(name='Log G', format='E', array=log_g)
-    col5 =  fits.Column(name='Mass', format='E', array=initial_mass)
+    evo_stage = np.array([])
+    ones = np.full(len(allAges), 1)
+    col1 = fits.Column(name='age', format='E', array=x)
+    col2 = fits.Column(name='feh', format='E', array=metallicitylist)
+    col3 = fits.Column(name='T', format='E', array=Teff)
+    col4 = fits.Column(name='logg', format='E', array=log_g)
+    col5 =  fits.Column(name='mass', format='E', array=initial_mass)
     col6 =  fits.Column(name='J', format='E', array=_2Mass_J)
     col7 =  fits.Column(name='H', format='E', array=_2Mass_H)
-    col8 =  fits.Column(name='Ks', format='E', array=_2Mass_Ks)
-    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8])
+    col8 =  fits.Column(name='K', format='E', array=_2Mass_Ks)
+    col9 =  fits.Column(name='stage', format='K', array=evo_stage) #'K' --> 64-bit integer
+    col10 = fits.Column(name='weight', format='E', array=ones)
+    cols = fits.ColDefs([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10])
     tbhdu = fits.BinTableHDU.from_columns(cols)
-    tbhdu.writeto(outpath + 'Yale.fits', clobber=True) #fits outfile
+    ageGridhdu = fits.BinTableHDU.from_columns([fits.Column(name='Age Grid', format='E', array=listOfAges)])
+    agelisthdr = fits.Header()
+    agelisthdr['Ages'] = 'Age grid'
+    agelisthdu = fits.PrimaryHDU(header=agelisthdr)
+    tbhdulist = fits.HDUList([agelisthdu, tbhdu, ageGridhdu])
+    tbhdulist.writeto(outpath + 'Yale.fits', clobber=True) #fits outfile
     
  
 #inputAge = str(0.150)# raw_input('')
@@ -119,7 +128,6 @@ _2Mass_Ks = []
 Teff = []
 metallicitylist = []
 allAges = []
-
 for file in sorted(os.listdir(inpath)):
     file1 = file
     x = 5
@@ -140,8 +148,15 @@ for file in sorted(os.listdir(inpath)):
     Ages = CompiledAges(listOfAges, initial_mass, columns)
     allAges.extend(Ages)
     print file1 + '\t' + str(metallicity)
+    i += 1
 
+#print listOfAges
 
+allAges = np.array(allAges).dot(1000000000)
+allAges = np.log10(allAges)
+listOfAges = np.array(listOfAges).dot(1000000000)
+listOfAges = np.log10(listOfAges)
 Teff.extend(np.power(10, log_Teff))
-fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath)
+fitsTable(allAges, metallicitylist, initial_mass, Teff, log_g, _2Mass_J, _2Mass_H, _2Mass_Ks, outpath, listOfAges)
 print 'FITS file created for Yale'
+
